@@ -11,6 +11,7 @@ Directive :: struct {
 }
 List :: distinct []string
 
+
 Graph_data :: union {
 	f64,
 	bool,
@@ -18,6 +19,7 @@ Graph_data :: union {
 	string,
 	Directive,
 	List,
+	Expression,
 }
 
 Graph_node :: struct {
@@ -76,7 +78,6 @@ iterate_graph :: proc(g: map[string]^Graph_node) -> (key: string, value: Graph_d
 			{
 				list := cast([]string)g[""].data.(List)
 				append_elems(&accum, ..list)
-				fmt.printfln("%v", accum)
 				state += 1
 				fallthrough
 			}
@@ -135,7 +136,7 @@ parse_key_val :: proc(
 
 			first_tk := tknz.scan(tk)
 			if first_tk.kind != .Open_Brace {
-				new_node := new_clone(parse_val(tk, graph, first_tk))
+				new_node := new_clone(parse_val(tk, first_tk))
 				graph[key] = new_node
 
 			} else {
@@ -200,13 +201,7 @@ parse_key_val :: proc(
 	os.exit(1)
 }
 
-parse_val :: proc(
-	tk: ^tknz.Tokenizer,
-	graph: ^map[string]^Graph_node,
-	first: tknz.Token,
-) -> (
-	node: Graph_node,
-) {
+parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node) {
 	fallow := first
 	debug_print("Fallow in parse_val is:%v", fallow)
 
@@ -275,7 +270,4 @@ parse_val :: proc(
 		}
 
 	}
-
-	if true do fmt.panicf("Parse value always returns a value")
-	os.exit(1)
 }
