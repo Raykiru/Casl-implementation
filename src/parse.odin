@@ -1,3 +1,4 @@
+#+vet explicit-allocators
 package casl
 
 import "core:fmt"
@@ -31,8 +32,8 @@ when ODIN_DEBUG {
 	debug_print :: fmt.printfln
 } else {debug_print :: proc(_: ..any) {}}
 
-directive_strip_last :: proc(dir: string) -> string {
-	parts := strings.split(dir, ".")
+directive_strip_last :: proc(dir: string, allocator := context.allocator) -> string {
+	parts := strings.split(dir, ".", allocator)
 	last_part_len := len(parts[:len(parts)])
 	return dir[:last_part_len]
 }
@@ -100,7 +101,8 @@ Parse_error :: union {
 parse_key_val :: proc(
 	tk: ^tknz.Tokenizer,
 	graph: ^map[string]^Graph_node,
-	parent: string,
+	parent: string = "",
+	allocator := context.allocator,
 ) -> (
 	key: string,
 	err: Parse_error,
@@ -117,7 +119,8 @@ parse_key_val :: proc(
 	}
 	if token.kind == .Ident {
 		debug_print("Found identifier:%v", token.text)
-		key = token.text if parent == "" else fmt.aprintf("%v.%v", parent, token.text)
+		key =
+			token.text if parent == "" else fmt.aprintf("%v.%v", parent, token.text, allocator = allocator)
 		equal := tknz.scan(tk)
 		for equal.kind == .Comment {equal = tknz.scan(tk)}
 		if equal.kind != .Eq {
@@ -126,6 +129,7 @@ parse_key_val :: proc(
 				token.pos,
 				token.kind,
 				token.text,
+				allocator = allocator,
 			)
 			return
 		}
@@ -135,8 +139,8 @@ parse_key_val :: proc(
 
 		if first_tk.kind != .Open_Brace {
 			debug_print("No open brace, just an ident")
-			expr := parse_expr(tk, first_tk) or_return
-			new_node := new_clone(expr)
+			expr := parse_expr(tk, first_tk, allocator = allocator) or_return
+			new_node := new_clone(expr, allocator)
 			graph[key] = new_node
 
 		} else {
@@ -153,7 +157,7 @@ parse_key_val :: proc(
 					debug_print("Found end of nested close_brace, breaking out")
 
 					final_list := list[:]
-					new_node := new_clone(Graph_node{data = List(final_list)})
+					new_node := new_clone(Graph_node{data = List(final_list)}, allocator)
 					graph[key] = new_node
 
 					break list_loop
@@ -163,13 +167,16 @@ parse_key_val :: proc(
 				}
 
 
-				nested_key := parse_key_val(tk, graph, key) or_return
+				nested_key := parse_key_val(tk, graph, key, allocator) or_return
 				if nested_key != "" {
 					append(&list, nested_key)
 					continue list_loop
 				}
 				// find close brace
-				err = cast(Err_No_Closing_Brace)fmt.aprintf("Didn't find closing brace")
+				err = cast(Err_No_Closing_Brace)fmt.aprintf(
+					"Didn't find closing brace",
+					allocator = allocator,
+				)
 				return
 			}
 
@@ -192,6 +199,7 @@ parse_key_val :: proc(
 			err = cast(Err_Unexpected_Token)fmt.aprintf(
 				"Expected trailing comma, got %v intead",
 				last_tk,
+				allocator = allocator,
 			)
 			return
 		}
@@ -203,12 +211,20 @@ parse_key_val :: proc(
 			token.pos,
 			token.kind,
 			token.text,
+			allocator = allocator,
 		)
 		return
 	}
 }
 
-parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node, err: Parse_error) {
+parse_val :: proc(
+	tk: ^tknz.Tokenizer,
+	first: tknz.Token,
+	allocator := context.allocator,
+) -> (
+	node: Graph_node,
+	err: Parse_error,
+) {
 	fallow := first
 	debug_print("Fallow in parse_val is:%v", fallow)
 
@@ -235,6 +251,7 @@ parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node, 
 						fallow.pos,
 						fallow.kind,
 						fallow.text,
+						allocator = allocator,
 					)
 					return
 				}
@@ -267,6 +284,7 @@ parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node, 
 			fallow.pos,
 			fallow.kind,
 			fallow.text,
+			allocator = allocator,
 		)
 		return
 	case:

@@ -1,3 +1,4 @@
+#+vet explicit-allocators
 package casl
 
 import "core:fmt"
@@ -35,12 +36,13 @@ Expression :: union {
 parse_expr :: proc(
 	tk: ^tknz.Tokenizer,
 	first: tknz.Token,
+	allocator := context.allocator,
 ) -> (
 	node: Graph_node,
 	err: Parse_error,
 ) {
 
-	node = parse_val(tk, first) or_return
+	node = parse_val(tk, first, allocator) or_return
 
 	tk_savepoint := tk^
 
@@ -49,9 +51,9 @@ parse_expr :: proc(
 	#partial switch fallow.kind {
 	case .Quo:
 		{
-			left_expr := Unit(new_clone(node))
+			left_expr := Unit(new_clone(node, allocator))
 			fallow = tknz.scan(tk)
-			right_node := parse_val(tk, fallow) or_return
+			right_node := parse_val(tk, fallow, allocator) or_return
 			#partial switch right in right_node.data {
 			// allowed to be the right
 			case f64, i64:
@@ -68,21 +70,23 @@ parse_expr :: proc(
 						"Imcompatible types for binary div: %#v %#v",
 						node,
 						right_node.data,
+						allocator = allocator,
 					)
 					return
 				}
 
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.DIV, left_expr, right_expr}}, nil
 			case Directive:
 				// always allowed, will be checked on dereference
-				right_expr := Unit(new_clone(right_node.data))
+				right_expr := Unit(new_clone(right_node.data, allocator))
 				return Graph_node{data = Bin_expr{.DIV, left_expr, right_expr}}, nil
 			case:
 				err = cast(Err_Type_Missmatch)fmt.aprintf(
 					"Unsuported types for binary div: %#v %#v",
 					node,
 					right_node.data,
+					allocator = allocator,
 				)
 
 				return
@@ -90,9 +94,9 @@ parse_expr :: proc(
 		}
 	case .Mul:
 		{
-			left_expr := Unit(new_clone(node))
+			left_expr := Unit(new_clone(node, allocator))
 			fallow = tknz.scan(tk)
-			right_node := parse_val(tk, fallow) or_return
+			right_node := parse_val(tk, fallow, allocator) or_return
 			missmatch := true
 			#partial switch right in right_node.data {
 			// allowed to be the right
@@ -110,30 +114,32 @@ parse_expr :: proc(
 							"Imcompatible types for binary mul: %#v %#v",
 							node,
 							right_node.data,
+							allocator = allocator,
 						)
 						return
 					}
-					right_expr := Unit(new_clone(right_node))
+					right_expr := Unit(new_clone(right_node, allocator))
 					return Graph_node{data = Bin_expr{.MUL, left_expr, right_expr}}, nil
 				}
 			case Directive:
 				// always allowed, will be checked on dereference
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.MUL, left_expr, right_expr}}, nil
 			case:
 				err = cast(Err_Type_Missmatch)fmt.aprintf(
 					"Unsuported types for binary mul: %#v %#v",
 					node,
 					right_node.data,
+					allocator = allocator,
 				)
 				return
 			}
 		}
 	case .Sub:
 		{
-			left := Unit(new_clone(node))
+			left := Unit(new_clone(node, allocator))
 			fallow = tknz.scan(tk)
-			right_node := parse_val(tk, fallow) or_return
+			right_node := parse_val(tk, fallow, allocator) or_return
 
 			missmatch := true
 
@@ -152,21 +158,23 @@ parse_expr :: proc(
 						"Imcompatible types for binary sub: %#v %#v",
 						node,
 						right_node.data,
+						allocator = allocator,
 					)
 					return
 				}
 
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.SUB, left, right_expr}}, nil
 			case Directive:
 				// always allowed, will be checked on dereference
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.SUB, left, right_expr}}, nil
 			case:
 				err = cast(Err_Type_Missmatch)fmt.aprintf(
 					"Unsuported types for binary sub: %#v %#v",
 					node,
 					right_node.data,
+					allocator = allocator,
 				)
 				return
 			}
@@ -174,9 +182,9 @@ parse_expr :: proc(
 
 	case .Add:
 		{
-			left := Unit(new_clone(node))
+			left := Unit(new_clone(node, allocator))
 			fallow = tknz.scan(tk)
-			right_node := parse_val(tk, fallow) or_return
+			right_node := parse_val(tk, fallow, allocator) or_return
 			missmatch := true
 
 			#partial switch right in right_node.data {
@@ -194,15 +202,16 @@ parse_expr :: proc(
 						"Imcompatible types for binary add: %#v %#v",
 						node.data,
 						right_node.data,
+						allocator = allocator,
 					)
 					return
 				}
 
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}, nil
 			case Directive:
 				// always allowed, will be checked on dereference
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}, nil
 			case string:
 				// matches type
@@ -217,17 +226,19 @@ parse_expr :: proc(
 						"Imcompatible types for binary add: %#v %#v",
 						node,
 						right_node.data,
+						allocator = allocator,
 					)
 					return
 				}
 
-				right_expr := Unit(new_clone(right_node))
+				right_expr := Unit(new_clone(right_node, allocator))
 				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}, nil
 			case:
 				err = cast(Err_Type_Missmatch)fmt.aprintf(
 					"Unexpected types for binary add: %#v %#v",
 					node,
 					right_node.data,
+					allocator = allocator,
 				)
 				return
 
@@ -243,6 +254,7 @@ parse_expr :: proc(
 			"Unhandled token kind for fallow in parse_expr: %v (%v)",
 			fallow.kind,
 			fallow.text,
+			allocator = allocator,
 		)
 		return
 	}
