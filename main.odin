@@ -35,4 +35,10 @@ main :: proc() {
 		fmt.printfln("key:<%v> val:<%#v>", key, val)
 	}
 
+	graph[""].visited += 1
+
+	fmt.println(casl.get_value(graph, "main.ref_ref"))
+	fmt.println(casl.get_value(graph, "main.circle_ref"))
+	fmt.println(casl.get_value(graph, "none"))
+
 }

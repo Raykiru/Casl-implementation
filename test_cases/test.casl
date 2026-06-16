@@ -5,6 +5,12 @@ main = {
 	binary_mul = main.one*69,
 	binary_div = main.one/69,
 	text_concat = main.unary + "world",
+	ref = main.one,
+	ref_ref = main.ref,
+	circle_ref = main.circle_ref1,
+	circle_ref1 = main.circle_ref2,
+	circle_ref2 = main.circle_ref1,
+
 	unary = "???",
 	unit = 0.0,
 
