@@ -9,8 +9,8 @@ import "core:strings"
 Directive :: struct {
 	path: string,
 }
-List :: distinct []string
 
+List :: distinct []string
 
 Graph_data :: union {
 	f64,
@@ -26,8 +26,10 @@ Graph_node :: struct {
 	data:    Graph_data,
 	visited: uint,
 }
-when ODIN_DEBUG {debug_print :: fmt.printfln} else {debug_print :: proc(_: ..any) {}}
 
+when ODIN_DEBUG {
+	debug_print :: fmt.printfln
+} else {debug_print :: proc(_: ..any) {}}
 
 directive_strip_last :: proc(dir: string) -> string {
 	parts := strings.split(dir, ".")
@@ -55,6 +57,7 @@ iterate_graph :: proc(g: map[string]^Graph_node) -> (key: string, value: Graph_d
 		case:
 			{
 				if len(accum) == 0 {
+					g[""].visited += 1
 					ok = false
 					return
 				}
@@ -83,6 +86,15 @@ iterate_graph :: proc(g: map[string]^Graph_node) -> (key: string, value: Graph_d
 	return
 }
 
+Err_Unexpected_Token :: distinct string
+Err_Type_Missmatch :: distinct string
+Err_No_Closing_Brace :: distinct string
+
+Parse_error :: union {
+	Err_Unexpected_Token,
+	Err_Type_Missmatch,
+	Err_No_Closing_Brace,
+}
 
 // parses a single key-value pair
 parse_key_val :: proc(
@@ -91,90 +103,112 @@ parse_key_val :: proc(
 	parent: string,
 ) -> (
 	key: string,
+	err: Parse_error,
 ) {
 
 	key = ""
 
-	for {
-		token := tknz.scan(tk)
-		for token.kind == .Comment {
-			// skill all comments
-			token = tknz.scan(tk)
-		}
-		if token.kind == .Ident {
-			debug_print("Found identifier:%v", token.text)
-			key = token.text if parent == "" else fmt.aprintf("%v.%v", parent, token.text)
-			equal := tknz.scan(tk)
-			for equal.kind == .Comment {equal = tknz.scan(tk)}
-			if equal.kind != .Eq {
-				if true do fmt.panicf("(%v)Unexpected token, expected an equal sign, got %v:%v instead", token.pos, token.kind, token.text)
-				os.exit(1)
-			}
 
-			first_tk := tknz.scan(tk)
-			for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
-
-			if first_tk.kind != .Open_Brace {
-				new_node := new_clone(parse_expr(tk, first_tk))
-				graph[key] = new_node
-
-			} else {
-				list: [dynamic]string
-				list_loop: for {
-
-					tk_savepoint := tk^
-					first_tk = tknz.scan(tk)
-					for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
-					debug_print("Iteration of nested key_value pair, first_tk is:%v", first_tk)
-					if first_tk.kind == .Close_Brace {
-						debug_print("Found end of nested close_brace, breaking out")
-
-						final_list := list[:]
-						new_node := new_clone(Graph_node{data = List(final_list)})
-						graph[key] = new_node
-
-						break list_loop
-					} else {
-						// not finished, restore
-						tk^ = tk_savepoint
-					}
-
-
-					nested_key := parse_key_val(tk, graph, key)
-					if nested_key != "" do append(&list, nested_key)
-					else {panic("didn't think ill get here")}
-					// else do break list_loop
-				}
-			}
-
-			// parse optional leftover comma
-			tk_savepoint := tk^
-			last_tk := tknz.scan(tk)
-			for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
-
-			if last_tk.kind == .Comma {return}
-
-			// also acceptable to leave out comma at the end of the file
-			if last_tk.kind == .EOF {return} else if last_tk.kind == .Close_Brace {
-				tk^ = tk_savepoint
-				return
-			} else {
-				if true do fmt.panicf("Expected trailing comma, got %v intead", last_tk)
-				os.exit(1)
-			}
-
-
-		} else if token.kind == .EOF {return ""} else {
-			if true do fmt.panicf("(%v)Unexpected token, expected an identifier, got %v:%v instead", token.pos, token.kind, token.text)
-			os.exit(1)
-		}
+	token := tknz.scan(tk)
+	debug_print("%v", token)
+	for token.kind == .Comment {
+		// skill all comments
+		token = tknz.scan(tk)
 	}
+	if token.kind == .Ident {
+		debug_print("Found identifier:%v", token.text)
+		key = token.text if parent == "" else fmt.aprintf("%v.%v", parent, token.text)
+		equal := tknz.scan(tk)
+		for equal.kind == .Comment {equal = tknz.scan(tk)}
+		if equal.kind != .Eq {
+			err = cast(Err_Unexpected_Token)fmt.aprintf(
+				"(%v)Unexpected token, expected an equal sign, got %v:%v instead",
+				token.pos,
+				token.kind,
+				token.text,
+			)
+			return
+		}
 
-	fmt.print("was not supposed to reach this")
-	os.exit(1)
+		first_tk := tknz.scan(tk)
+		for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
+
+		if first_tk.kind != .Open_Brace {
+			debug_print("No open brace, just an ident")
+			expr := parse_expr(tk, first_tk) or_return
+			new_node := new_clone(expr)
+			graph[key] = new_node
+
+		} else {
+			list: [dynamic]string
+			list_loop: for {
+
+				tk_savepoint := tk^
+				first_tk = tknz.scan(tk)
+				for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
+
+				debug_print("Iteration of nested key_value pair, first_tk is:%v", first_tk)
+
+				if first_tk.kind == .Close_Brace {
+					debug_print("Found end of nested close_brace, breaking out")
+
+					final_list := list[:]
+					new_node := new_clone(Graph_node{data = List(final_list)})
+					graph[key] = new_node
+
+					break list_loop
+				} else {
+					// not finished, restore
+					tk^ = tk_savepoint
+				}
+
+
+				nested_key := parse_key_val(tk, graph, key) or_return
+				if nested_key != "" {
+					append(&list, nested_key)
+					continue list_loop
+				}
+				// find close brace
+				err = cast(Err_No_Closing_Brace)fmt.aprintf("Didn't find closing brace")
+				return
+			}
+
+		}
+
+		// parse optional leftover comma
+		tk_savepoint := tk^
+		last_tk := tknz.scan(tk)
+		for first_tk.kind == .Comment {first_tk = tknz.scan(tk)}
+
+		if last_tk.kind == .Comma {return}
+
+		// also acceptable to leave out comma at the end of the file
+		if last_tk.kind == .EOF {
+			return
+		} else if last_tk.kind == .Close_Brace {
+			tk^ = tk_savepoint
+			return
+		} else {
+			err = cast(Err_Unexpected_Token)fmt.aprintf(
+				"Expected trailing comma, got %v intead",
+				last_tk,
+			)
+			return
+		}
+
+
+	} else if token.kind == .EOF {return "", nil} else {
+		err = cast(Err_Unexpected_Token)fmt.aprintf(
+			"(%v)Unexpected token, expected an identifier, got %v:%v instead",
+			token.pos,
+			token.kind,
+			token.text,
+		)
+		return
+	}
 }
 
-parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node) {
+parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node, err: Parse_error) {
 	fallow := first
 	debug_print("Fallow in parse_val is:%v", fallow)
 
@@ -196,8 +230,13 @@ parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node) 
 				strings.write_rune(&b, '.')
 				fallow = tknz.scan(tk)
 				if fallow.kind != .Ident {
-					if true do fmt.panicf("(%v)Expected Identifier, got %v:%v intead", fallow.pos, fallow.kind, fallow.text)
-					os.exit(1)
+					err = cast(Err_Unexpected_Token)fmt.aprintf(
+						"(%v)Expected Identifier, got %v:%v intead",
+						fallow.pos,
+						fallow.kind,
+						fallow.text,
+					)
+					return
 				}
 
 				strings.write_string(&b, fallow.text)
@@ -211,30 +250,31 @@ parse_val :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node) 
 		} // directive_loop
 
 		full_ident := strings.to_string(b)
-		return {data = Directive({full_ident})}
+		return {data = Directive({full_ident})}, nil
 
 
 	case .Integer:
 		val, _ := strconv.parse_i64(fallow.text, 10)
-		return {data = val}
+		return {data = val}, nil
 	case .Float:
 		val, _ := strconv.parse_f64(fallow.text)
-		return {data = val}
+		return {data = val}, nil
 	case .String:
-		return {data = fallow.text}
-	case .Eq, .Period, .Comma, .Close_Brace:
-		if true do fmt.panicf("(%v)Unexpected token, expected a value, got %v:%v instead", fallow.pos, fallow.kind, fallow.text)
-		os.exit(1)
-
-	case .Invalid:
-		if true do fmt.panicf("Invalid token: %v", fallow.text)
-		os.exit(1)
+		return {data = fallow.text}, nil
+	case .Eq, .Period, .Comma, .Close_Brace, .EOF:
+		err = cast(Err_Unexpected_Token)fmt.aprintf(
+			"(%v)Unexpected token, expected a value, got %v:%v instead",
+			fallow.pos,
+			fallow.kind,
+			fallow.text,
+		)
+		return
 	case:
 		if .B_Custom_Keyword_Begin < fallow.kind {
 			if fallow.text == "true" {
-				return {data = true}
+				return {data = true}, nil
 			} else if fallow.text == "false" {
-				return {data = false}
+				return {data = false}, nil
 			} else {
 				if true do fmt.panicf("Custom keyword %v not covered in fallow ", fallow.text)
 				os.exit(1)

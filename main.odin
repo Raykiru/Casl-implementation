@@ -22,7 +22,21 @@ main :: proc() {
 	global_list: [dynamic]string
 	key_loop: for {
 		casl.debug_print("Parsing first level of key_value pairs")
-		key := casl.parse_key_val(&tk, &graph, parent)
+		key, err := casl.parse_key_val(&tk, &graph, parent)
+
+		if err != nil {
+			fmt.printfln("%#v", graph)
+			switch err_text in err {
+			case casl.Err_Type_Missmatch:
+				fmt.eprint(cast(string)err_text)
+			case casl.Err_Unexpected_Token:
+				fmt.eprint(cast(string)err_text)
+			case casl.Err_No_Closing_Brace:
+				fmt.eprint(cast(string)err_text)
+			}
+
+			return
+		}
 		if key == "" {break}
 
 		append(&global_list, key)
@@ -31,14 +45,15 @@ main :: proc() {
 
 	graph[""] = new_clone(casl.Graph_node{data = cast(casl.List)global_list[:]})
 
+	fmt.println(graph)
+
 	for key, val in casl.iterate_graph(graph) {
 		fmt.printfln("key:<%v> val:<%#v>", key, val)
 	}
 
-	graph[""].visited += 1
-
-	fmt.println(casl.get_value(graph, "main.ref_ref"))
-	fmt.println(casl.get_value(graph, "main.circle_ref"))
-	fmt.println(casl.get_value(graph, "none"))
+	// this is for ./test_cases/test.casl
+	fmt.println(casl.get_value(graph, "main.binary_add"))
+	fmt.println(casl.get_value(graph, "main.binary_sub"))
+	fmt.println(casl.get_value(graph, "main.text_concat"))
 
 }
