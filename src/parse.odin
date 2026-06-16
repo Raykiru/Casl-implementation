@@ -24,7 +24,7 @@ Graph_data :: union {
 
 Graph_node :: struct {
 	data:    Graph_data,
-	visited: bool,
+	visited: uint,
 }
 when ODIN_DEBUG {debug_print :: fmt.printfln} else {debug_print :: proc(_: ..any) {}}
 
@@ -39,6 +39,7 @@ directive_strip_last :: proc(dir: string) -> string {
 iterate_graph :: proc(g: map[string]^Graph_node) -> (key: string, value: Graph_data, ok: bool) {
 	@(static) accum: [dynamic]string
 	@(static) state: int = 0
+	base_visited := g[""].visited
 
 	debug_print("before outer_loop")
 	outer_loop: for {
@@ -62,10 +63,10 @@ iterate_graph :: proc(g: map[string]^Graph_node) -> (key: string, value: Graph_d
 				ok = true
 
 				data, ok_data := g[current]
-				if data.visited {
+				if data.visited != base_visited {
 					// skip this one
 					continue outer_loop
-				} else {data.visited = true}
+				} else {data.visited = base_visited + 1}
 				key = current
 				value = data.data
 
@@ -129,7 +130,7 @@ parse_key_val :: proc(
 						debug_print("Found end of nested close_brace, breaking out")
 
 						final_list := list[:]
-						new_node := new_clone(Graph_node{List(final_list), false})
+						new_node := new_clone(Graph_node{data = List(final_list)})
 						graph[key] = new_node
 
 						break list_loop

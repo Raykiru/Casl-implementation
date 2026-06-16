@@ -29,10 +29,10 @@ main :: proc() {
 
 	}
 
-	graph[""] = new_clone(casl.Graph_node{cast(casl.List)global_list[:], true})
+	graph[""] = new_clone(casl.Graph_node{data = cast(casl.List)global_list[:]})
 
 	for key, val in casl.iterate_graph(graph) {
-		fmt.printfln("key:<%v>\nval:<%#v>", key, val)
+		fmt.printfln("key:<%v> val:<%#v>", key, val)
 	}
 
 }

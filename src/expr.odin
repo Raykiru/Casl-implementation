@@ -43,64 +43,67 @@ parse_expr :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node)
 	#partial switch fallow.kind {
 	case .Quo:
 		{
-			left := Unit(new_clone(node))
+			left_expr := Unit(new_clone(node))
 			fallow = tknz.scan(tk)
 			right_node := parse_val(tk, fallow)
-			#partial switch node in right_node.data {
+			#partial switch right in right_node.data {
 			// allowed to be the right
 			case f64, i64:
+				missmatch := true
 				// matches type
-				if _, is := node.(f64); is {
-					if _, is2 := right_node.data.(f64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.DIV, left, right}, false}
-					}
-				} else if _, is := node.(i64); is {
-					if _, is2 := right_node.data.(i64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.DIV, left, right}, false}
-					}
-				} else {
+				if _, is := node.data.(f64);
+				   is {if _, is2 := right_node.data.(f64); is2 {missmatch = false}
+				} else if _, is := node.data.(i64);
+				   is {if _, is2 := right_node.data.(i64); is2 {missmatch = false}
+				} else if _, is := node.data.(Directive); is {missmatch = false}
 
+				if missmatch {
 					if true do fmt.panicf("Imcompatible types for binary div: %#v %#v", node, right_node.data)
 					os.exit(1)
 				}
+
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.DIV, left_expr, right_expr}}
 			case Directive:
 				// always allowed, will be checked on dereference
-				right := Unit(new_clone(right_node))
-				return Graph_node{Bin_expr{.DIV, left, right}, false}
+				right_expr := Unit(new_clone(right_node.data))
+				return Graph_node{data = Bin_expr{.DIV, left_expr, right_expr}}
+			case:
+				if true do fmt.panicf("Unsuported types for binary div: %#v %#v", node, right_node.data)
+				os.exit(1)
 
 
 			}
 		}
 	case .Mul:
 		{
-			left := Unit(new_clone(node))
+			left_expr := Unit(new_clone(node))
 			fallow = tknz.scan(tk)
 			right_node := parse_val(tk, fallow)
-			#partial switch node in right_node.data {
+			missmatch := true
+			#partial switch right in right_node.data {
 			// allowed to be the right
 			case f64, i64:
 				// matches type
-				if _, is := node.(f64); is {
-					if _, is2 := right_node.data.(f64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.MUL, left, right}, false}
-					}
-				} else if _, is := node.(i64); is {
-					if _, is2 := right_node.data.(i64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.MUL, left, right}, false}
-					}
-				} else {
+				if _, is := node.data.(f64); is {
+					if _, is2 := right_node.data.(f64); is2 {missmatch = false}
+				} else if _, is := node.data.(i64); is {
+					if _, is2 := right_node.data.(i64); is2 {missmatch = false}
+				} else if _, is := node.data.(Directive); is {missmatch = false}
 
+				if missmatch {
 					if true do fmt.panicf("Imcompatible types for binary mul: %#v %#v", node, right_node.data)
 					os.exit(1)
 				}
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.MUL, left_expr, right_expr}}
 			case Directive:
 				// always allowed, will be checked on dereference
-				right := Unit(new_clone(right_node))
-				return Graph_node{Bin_expr{.MUL, left, right}, false}
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.MUL, left_expr, right_expr}}
+			case:
+				if true do fmt.panicf("Unsuported types for binary mul: %#v %#v", node, right_node.data)
+				os.exit(1)
 
 
 			}
@@ -110,29 +113,33 @@ parse_expr :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node)
 			left := Unit(new_clone(node))
 			fallow = tknz.scan(tk)
 			right_node := parse_val(tk, fallow)
-			#partial switch node in right_node.data {
+
+			missmatch := true
+
+			#partial switch right in right_node.data {
 			// allowed to be the right
 			case f64, i64:
 				// matches type
-				if _, is := node.(f64); is {
-					if _, is2 := right_node.data.(f64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.SUB, left, right}, false}
-					}
-				} else if _, is := node.(i64); is {
-					if _, is2 := right_node.data.(i64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.SUB, left, right}, false}
-					}
-				} else {
+				if _, is := node.data.(f64); is {
+					if _, is2 := right_node.data.(f64); is2 {missmatch = false}
+				} else if _, is := node.data.(i64); is {
+					if _, is2 := right_node.data.(i64); is2 {missmatch = false}
+				} else if _, is := node.data.(Directive); is {missmatch = false}
 
+				if missmatch {
 					if true do fmt.panicf("Imcompatible types for binary sub: %#v %#v", node, right_node.data)
 					os.exit(1)
 				}
+
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.SUB, left, right_expr}}
 			case Directive:
 				// always allowed, will be checked on dereference
-				right := Unit(new_clone(right_node))
-				return Graph_node{Bin_expr{.SUB, left, right}, false}
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.SUB, left, right_expr}}
+			case:
+				if true do fmt.panicf("Unsuported types for binary sub: %#v %#v", node, right_node.data)
+				os.exit(1)
 
 
 			}
@@ -143,29 +150,47 @@ parse_expr :: proc(tk: ^tknz.Tokenizer, first: tknz.Token) -> (node: Graph_node)
 			left := Unit(new_clone(node))
 			fallow = tknz.scan(tk)
 			right_node := parse_val(tk, fallow)
-			#partial switch node in right_node.data {
+			missmatch := true
+
+			#partial switch right in right_node.data {
 			// allowed to be the right
 			case f64, i64:
 				// matches type
-				if _, is := node.(f64); is {
-					if _, is2 := right_node.data.(f64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.ADD, left, right}, false}
-					}
-				} else if _, is := node.(i64); is {
-					if _, is2 := right_node.data.(i64); is2 {
-						right := Unit(new_clone(right_node))
-						return Graph_node{Bin_expr{.ADD, left, right}, false}
-					}
-				} else {
+				if _, is := node.data.(f64); is {
+					if _, is2 := right_node.data.(f64); is2 {missmatch = false}
+				} else if _, is := node.data.(i64); is {
+					if _, is2 := right_node.data.(i64); is2 {missmatch = false}
+				} else if _, is := node.data.(Directive); is {missmatch = false}
 
+				if missmatch {
+					if true do fmt.panicf("Imcompatible types for binary add: %#v %#v", node.data, right_node.data)
+					os.exit(1)
+				}
+
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}
+			case Directive:
+				// always allowed, will be checked on dereference
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}
+			case string:
+				// matches type
+				if _, is := node.data.(f64); is {
+					if _, is2 := right_node.data.(f64); is2 {missmatch = false}
+				} else if _, is := node.data.(i64); is {
+					if _, is2 := right_node.data.(i64); is2 {missmatch = false}
+				} else if _, is := node.data.(Directive); is {missmatch = false}
+
+				if missmatch {
 					if true do fmt.panicf("Imcompatible types for binary add: %#v %#v", node, right_node.data)
 					os.exit(1)
 				}
-			case Directive:
-				// always allowed, will be checked on dereference
-				right := Unit(new_clone(right_node))
-				return Graph_node{Bin_expr{.ADD, left, right}, false}
+
+				right_expr := Unit(new_clone(right_node))
+				return Graph_node{data = Bin_expr{.ADD, left, right_expr}}
+			case:
+				if true do fmt.panicf("Unexpected types for binary add: %#v %#v", node, right_node.data)
+				os.exit(1)
 
 
 			}
