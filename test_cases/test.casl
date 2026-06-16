@@ -1,0 +1,11 @@
+main = {
+	one = 1,
+	binary_add = main.one+2,
+	binary_sub = main.one-3,
+	binary_mul = main.one*69,
+	binary_div = main.one/69,
+	text_concat = main.unary + "world",
+	unary = "???",
+	unit = 0.0,
+
+}

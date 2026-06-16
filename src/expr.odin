@@ -1,4 +1,4 @@
-package main
+package casl
 
 import "core:fmt"
 import tknz "core:odin/tokenizer"
